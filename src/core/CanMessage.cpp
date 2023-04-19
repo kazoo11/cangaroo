@@ -184,6 +184,34 @@ void CanMessage::setByte(const uint8_t index, const uint8_t value) {
 
 uint64_t CanMessage::extractRawSignal(uint8_t start_bit, const uint8_t length, const bool isBigEndian) const
 {
+    if(isBigEndian)
+    {
+        int firstByte = start_bit / 8;
+        uint64_t data = _u8[firstByte];
+        data &= (0xFF >> (7 - start_bit%8));
+
+        int lastByte = firstByte;
+        int len = length - (start_bit%8 + 1);
+
+        if(len > 0)
+            lastByte += (len/8)+1;
+
+        for(int i = firstByte; i < lastByte; i++)
+        {
+            data <<= 8;
+            data |= _u8[i+1];
+        }
+
+        int shiftAmount = start_bit%8 - length%8 + 1;
+        if(shiftAmount < 0)
+            shiftAmount += 8;
+        else if(shiftAmount == 8)
+            shiftAmount = 0;
+        data >>= shiftAmount;
+
+        return data;
+    }
+
 //    if ((start_bit+length) > (getLength()*8)) {
 //        return 0;
 //    }
@@ -198,17 +226,6 @@ uint64_t CanMessage::extractRawSignal(uint8_t start_bit, const uint8_t length, c
     mask = ~mask;
 
     data &= mask;
-
-    // If the length is greater than 8, we need to byteswap to preserve endianness
-    if (isBigEndian && (length > 8))
-    {
-
-        // Swap bytes
-        data = __builtin_bswap64(data);
-
-        // Shift out unused bits
-        data >>= 64 - length;
-    }
 
     return data;
 }
